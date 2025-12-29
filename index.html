@@ -11,7 +11,7 @@
         .van-nav-bar { background: #fff; }
         .list-card { margin: 16px; background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
         .group-header { padding: 16px; background: linear-gradient(135deg, #4b89ff, #2f74ff); color: white; display: flex; justify-content: space-between; align-items: center; }
-        .group-title { font-size: 17px; font-weight: bold; flex: 1; }
+        .group-title { font-size: 17px; font-weight: bold; flex: 1; margin-right: 8px; line-height: 1.4; }
         .category-tag { padding: 8px 16px; font-size: 13px; font-weight: 600; color: #8a8a8e; background-color: #fafafa; }
         .item-row { display: flex; align-items: flex-start; padding: 16px; background: white; border-bottom: 0.5px solid #f2f2f2; }
         .content-col { flex: 1; margin: 0 12px; min-width: 0; }
@@ -27,7 +27,7 @@
         <div id="capture-area" :class="{'hide-for-pic': isExporting}">
             <van-nav-bar title="Tation清单" class="no-print">
                 <template #right>
-                    <van-icon name="share-o" size="20" @click="showShare = true" />
+                    <van-icon name="share-o" size="22" @click="showShare = true" color="#2f74ff" />
                 </template>
             </van-nav-bar>
 
@@ -44,24 +44,30 @@
                             <div class="item-name" :class="{ completed: item.checked }">{{ item.name }}</div>
                             <div v-if="item.remark" class="remark" :class="{ completed: item.checked }">{{ item.remark }}</div>
                         </div>
-                        <van-icon name="cross" size="16" color="#c7c7cc" @click.stop="removeItem(gIndex, cName, iIndex)" class="action-icon no-print" />
+                        <van-icon name="cross" size="18" color="#c7c7cc" @click.stop="removeItem(gIndex, cName, iIndex)" class="action-icon no-print" />
                     </div>
                 </div>
                 <div class="no-print" style="padding: 16px;"><van-button icon="plus" plain type="primary" block round @click="openItemDialog(gIndex)">添加物品</van-button></div>
             </div>
-            <van-empty v-if="groups.length === 0" description="暂无清单"></van-empty>
+            <van-empty v-if="groups.length === 0" description="点击下方新建模块开始"></van-empty>
         </div>
 
         <div class="footer-bar no-print">
-            <van-button icon="photo-o" type="primary" plain round @click="exportImage" :loading="isExporting" style="flex: 1; height: 48px;">长图</van-button>
+            <van-button icon="photo-o" type="primary" plain round @click="exportImage" :loading="isExporting" style="flex: 1; height: 48px;">生成图片</van-button>
             <van-button icon="plus" type="primary" round @click="showAddGroup = true" style="flex: 2; height: 48px; font-weight: bold;">新建清单模块</van-button>
         </div>
 
-        <van-action-sheet v-model:show="showShare" title="数据备份与分享">
-            <div style="padding: 20px 16px 40px;">
-                <van-button block type="primary" plain round style="margin-bottom: 12px;" @click="exportData">导出数据（复制到剪贴板）</van-button>
-                <van-button block type="success" plain round @click="importData">导入数据（从剪贴板读取）</van-button>
-                <p style="font-size: 12px; color: #999; margin-top: 15px; text-align: center;">* 导出后可发送给好友，好友复制后点击导入即可同步</p>
+        <van-action-sheet v-model:show="showShare" title="清单共享与备份">
+            <div style="padding: 24px 16px 40px;">
+                <van-button block type="primary" plain round style="margin-bottom: 16px; height: 50px;" @click="exportData">
+                    导出清单 (复制到剪贴板)
+                </van-button>
+                <van-button block type="success" plain round style="height: 50px;" @click="importData">
+                    导入清单 (从剪贴板读取)
+                </van-button>
+                <p style="font-size: 13px; color: #969799; margin-top: 20px; line-height: 1.6; text-align: center;">
+                    将导出的文本通过微信发送给好友<br>好友复制全文后点击“导入”即可同步
+                </p>
             </div>
         </van-action-sheet>
 
@@ -70,16 +76,18 @@
                 <van-cell-group inset>
                     <van-field v-model="tempItem.catName" label="分类" placeholder="肉类/蔬菜/底料等" is-link readonly @click="showPicker = true"></van-field>
                     <van-field v-model="tempItem.name" label="名称" placeholder="请输入名称" rows="1" autosize type="textarea"></van-field>
-                    <van-field v-model="tempItem.remark" label="备注" placeholder="备注信息" rows="1" autosize type="textarea"></van-field>
+                    <van-field v-model="tempItem.remark" label="备注" placeholder="渠道或特殊要求" rows="1" autosize type="textarea"></van-field>
                 </van-cell-group>
-                <div style="margin: 16px;"><van-button block type="primary" round @click="addItem">确认添加</van-button></div>
+                <div style="margin: 20px 16px 0;"><van-button block type="primary" round @click="addItem">确认添加</van-button></div>
             </div>
         </van-action-sheet>
+
         <van-popup v-model:show="showPicker" round position="bottom">
-            <van-picker :columns="commonCats" @confirm="onCatConfirm" @cancel="showPicker = false"></van-picker>
+            <van-picker :columns="commonCats" @confirm="onCatConfirm" @cancel="showPicker = false" title="选择分类"></van-picker>
         </van-popup>
+
         <van-dialog v-model:show="showAddGroup" title="新建清单模块" show-cancel-button @confirm="addGroup">
-            <van-field v-model="newGroupName" placeholder="例如：1、火锅食材" style="padding: 24px;"></van-field>
+            <van-field v-model="newGroupName" placeholder="例如：1、火锅食材" style="padding: 24px;" maxlength="20" show-word-limit></van-field>
         </van-dialog>
     </div>
 
@@ -98,43 +106,55 @@
                 const commonCats = [{ text: '肉类' }, { text: '蔬菜类' }, { text: '底料类' }, { text: '水果类' }, { text: '饮品类' }, { text: '其他' }];
 
                 onMounted(() => {
-                    const saved = localStorage.getItem('tation_pro_data');
+                    const saved = localStorage.getItem('tation_pro_v2');
                     if (saved) groups.value = JSON.parse(saved);
                 });
 
-                const saveData = () => localStorage.setItem('tation_pro_data', JSON.stringify(groups.value));
+                const saveData = () => localStorage.setItem('tation_pro_v2', JSON.stringify(groups.value));
                 const toggleCheck = (item) => { item.checked = !item.checked; saveData(); };
                 const onCatConfirm = ({ selectedOptions }) => { tempItem.value.catName = selectedOptions[0].text; showPicker.value = false; };
                 const addGroup = () => { if (newGroupName.value) { groups.value.push({ name: newGroupName.value, categories: {} }); newGroupName.value = ''; saveData(); } };
-                const openItemDialog = (index) => { currentGroupIndex.value = index; tempItem.value = { catName: '肉类', name: '', remark: '' }; itemDialog.value = true; };
+                const openItemDialog = (i) => { currentGroupIndex.value = i; tempItem.value = { catName: '肉类', name: '', remark: '' }; itemDialog.value = true; };
                 const addItem = () => { if (!tempItem.value.name) return; const g = groups.value[currentGroupIndex.value]; if (!g.categories[tempItem.value.catName]) g.categories[tempItem.value.catName] = []; g.categories[tempItem.value.catName].push({ ...tempItem.value, checked: false }); itemDialog.value = false; saveData(); };
                 const removeItem = (g, c, i) => { groups.value[g].categories[c].splice(i, 1); if (groups.value[g].categories[c].length === 0) delete groups.value[g].categories[c]; saveData(); };
-                const removeGroup = (i) => { vant.showConfirmDialog({ title: '提醒', message: '删除该模块？' }).then(() => { groups.value.splice(i, 1); saveData(); }); };
+                const removeGroup = (i) => { vant.showConfirmDialog({ title: '提醒', message: '删除该模块及其清单？' }).then(() => { groups.value.splice(i, 1); saveData(); }); };
                 
-                // 导入导出逻辑
                 const exportData = () => {
-                    const dataStr = btoa(encodeURIComponent(JSON.stringify(groups.value)));
+                    const dataStr = JSON.stringify(groups.value);
                     navigator.clipboard.writeText(dataStr).then(() => {
-                        vant.showSuccessToast('数据已加密复制');
+                        vant.showSuccessToast('清单文本已成功复制');
                         showShare.value = false;
-                    });
+                    }).catch(() => vant.showFailToast('复制失败，请手动尝试'));
                 };
+
                 const importData = () => {
                     navigator.clipboard.readText().then(text => {
+                        let finalData;
                         try {
-                            const imported = JSON.parse(decodeURIComponent(atob(text)));
-                            vant.showConfirmDialog({ title: '导入确认', message: '导入将覆盖现有数据，确定吗？' }).then(() => {
-                                groups.value = imported;
+                            // 尝试直接解析 JSON (新版)
+                            finalData = JSON.parse(text);
+                        } catch (e) {
+                            try {
+                                // 尝试 Base64 解密 (旧版兼容)
+                                finalData = JSON.parse(decodeURIComponent(atob(text)));
+                            } catch (e2) {
+                                return vant.showFailToast('无效的清单内容');
+                            }
+                        }
+                        if (finalData) {
+                            vant.showConfirmDialog({ title: '确认导入', message: '导入将替换当前所有清单内容' }).then(() => {
+                                groups.value = finalData;
                                 saveData();
                                 vant.showSuccessToast('导入成功');
                                 showShare.value = false;
                             });
-                        } catch (e) { vant.showFailToast('无效的数据代码'); }
-                    });
+                        }
+                    }).catch(() => vant.showFailToast('无法访问剪贴板'));
                 };
 
                 const exportImage = () => {
                     isExporting.value = true;
+                    vant.showLoadingToast({ message: '生成中...', forbidClick: true });
                     setTimeout(() => {
                         html2canvas(document.getElementById('capture-area'), { scale: 3, backgroundColor: '#f7f8fa' }).then(canvas => {
                             const link = document.createElement('a');
@@ -142,6 +162,7 @@
                             link.href = canvas.toDataURL();
                             link.click();
                             isExporting.value = false;
+                            vant.closeToast();
                         });
                     }, 500);
                 };
