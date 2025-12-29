@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tation清单</title>
+    <link rel="stylesheet" href="https://fastly.jsdelivr.net/npm/vant@4/lib/index.css" />
+    <style>
+        :root { --van-primary-color: #1989fa; } /* 定义全局蓝色主题 */
+        body { background-color: #f2f6fc; padding-bottom: 100px; margin: 0; }
+        #capture-area { background-color: #f2f6fc; padding: 1px 0; }
+        
+        /* 卡片样式 */
+        .list-card { margin: 12px; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(25, 137, 250, 0.1); }
+        .group-header { padding: 14px 16px; background: #1989fa; color: white; font-weight: bold; font-size: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .category-title { padding: 8px 16px; background: #eef5fe; color: #1989fa; font-size: 13px; font-weight: bold; border-bottom: 1px solid #d1e3f9; }
+        
+        /* 列表行样式 */
+        .item-row { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid #ebedf0; background: white; }
+        .item-info { flex: 1; margin-left: 12px; overflow: hidden; /* 确保子元素溢出隐藏 */ }
+        
+        /* 字符不换行处理 */
+        .item-name { 
+            font-size: 15px; 
+            color: #323233; 
+            white-space: nowrap; /* 强制不换行 */
+            overflow: hidden; 
+            text-overflow: ellipsis; /* 超出显示省略号 */
+            max-width: 100%; 
+            display: block;
+        }
+        .completed { text-decoration: line-through; color: #c8c9cc; }
+        .remark { font-size: 12px; color: #969799; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* 底部操作栏 */
+        .footer-bar { position: fixed; bottom: 0; width: 100%; display: flex; background: white; padding: 12px 16px; box-sizing: border-box; border-top: 1px solid #ebedf0; z-index: 100; box-shadow: 0 -2px 10px rgba(0,0,0,0.05); }
+        .no-print { display: flex; gap: 10px; width: 100%; }
+        
+        /* 生成图片时的微调 */
+        .hide-for-pic .action-icon { display: none !important; }
+        .hide-for-pic .item-row { padding-right: 16px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="capture-area" :class="{'hide-for-pic': isExporting}">
+            <van-nav-bar title="Tation清单" class="no-print">
+                <template #left>
+                    <van-icon name="shopping-cart-o" size="18" color="#1989fa" />
+                </template>
+            </van-nav-bar>
+
+            <div v-for="(group, gIndex) in groups" :key="gIndex" class="list-card">
+                <div class="group-header">
+                    <span class="item-name" style="color: white; font-size: 16px;">{{ group.name }}</span>
+                    <van-icon name="delete-o" @click="removeGroup(gIndex)" class="action-icon no-print" />
+                </div>
+
+                <div v-for="(cat, cName) in group.categories" :key="cName">
+                    <div class="category-title">{{ cName }}</div>
+                    
+                    <div v-for="(item, iIndex) in cat" :key="iIndex" class="item-row">
+                        <van-checkbox v-model="item.checked" checked-color="#1989fa" @change="saveData" class="action-icon"></van-checkbox>
+                        <div class="item-info">
+                            <div class="item-name" :class="{ completed: item.checked }">{{ item.name }}</div>
+                            <div v-if="item.remark" class="remark">{{ item.remark }}</div>
+                        </div>
+                        <van-icon name="clear" size="18" color="#eeeeee" @click="removeItem(gIndex, cName, iIndex)" class="action-icon no-print" />
+                    </div>
+                </div>
+
+                <div class="no-print" style="padding: 12px;">
+                    <van-button size="small" icon="plus" plain type="primary" block round @click="openItemDialog(gIndex)">添加新物品</van-button>
+                </div>
+            </div>
+            
+            <van-empty v-if="groups.length === 0" description="清单空空如也" />
+        </div>
+
+        <div class="footer-bar no-print">
+            <van-button icon="photo-o" type="primary" plain round @click="exportImage" :loading="isExporting" style="flex: 1;">生成长图</van-button>
+            <van-button icon="plus" type="primary" round @click="showAddGroup = true" style="flex: 2;">新建清单模块</van-button>
+        </div>
+
+        <van-dialog v-model:show="itemDialog" title="添加食材" show-cancel-button @confirm="addItem">
+            <van-cell-group inset style="margin-top: 10px;">
+                <van-field v-model="tempItem.catName" label="分类" placeholder="肉类/蔬菜/底料"></van-field>
+                <van-field v-model="tempItem.name" label="名称" placeholder="10字以内排版更佳"></van-field>
+                <van-field v-model="tempItem.remark" label="备注" placeholder="购买渠道或已有备注"></van-field>
+            </van-cell-group>
+        </van-dialog>
+
+        <van-dialog v-model:show="showAddGroup" title="新建清单模块" show-cancel-button @confirm="addGroup">
+            <van-field v-model="newGroupName" placeholder="如：3、水果零食" style="padding: 20px;"></van-field>
+        </van-dialog>
+    </div>
+
+    <script src="https://fastly.jsdelivr.net/npm/vue@3"></script>
+    <script src="https://fastly.jsdelivr.net/npm/vant@4/lib/vant.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+    <script>
+        const { createApp, ref, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                const groups = ref([]);
+                const isExporting = ref(false);
+                const showAddGroup = ref(false);
+                const newGroupName = ref('');
+                const itemDialog = ref(false);
+                const currentGroupIndex = ref(null);
+                const tempItem = ref({ catName: '', name: '', remark: '' });
+
+                onMounted(() => {
+                    const saved = localStorage.getItem('tation_list_data');
+                    if (saved) {
+                        groups.value = JSON.parse(saved);
+                    } else {
+                        // 预设您提供的清单
+                        groups.value = [
+                            {
+                                name: "1、火锅食材",
+                                categories: {
+                                    "肉类": [
+                                        { name: "牛肉卷", remark: "网购/山姆，可烤", checked: false },
+                                        { name: "虾滑", remark: "已有", checked: false },
+                                        { name: "火锅丸子", remark: "已有", checked: false },
+                                        { name: "炸丸子", remark: "已有", checked: false }
+                                    ],
+                                    "蔬菜类": [
+                                        { name: "响铃卷", remark: "山姆/盒马", checked: false },
+                                        { name: "金针菇", remark: "多买点烤肉也用", checked: false },
+                                        { name: "土豆", remark: "已有，可以再买", checked: false }
+                                    ]
+                                }
+                            },
+                            {
+                                name: "2、烧烤食材",
+                                categories: {
+                                    "肉类": [
+                                        { name: "梅肉/牛肉", remark: "山姆购买", checked: false },
+                                        { name: "五花肉/鸡肉/虾", remark: "待定", checked: false }
+                                    ],
+                                    "蔬菜类": [
+                                        { name: "包浆豆腐", remark: "网购，尽快下单", checked: false },
+                                        { name: "口蘑/生菜/洋葱", remark: "超市购买", checked: false }
+                                    ]
+                                }
+                            }
+                        ];
+                    }
+                });
+
+                const saveData = () => {
+                    localStorage.setItem('tation_list_data', JSON.stringify(groups.value));
+                };
+
+                const addGroup = () => {
+                    if (newGroupName.value) {
+                        groups.value.push({ name: newGroupName.value, categories: {} });
+                        newGroupName.value = '';
+                        saveData();
+                    }
+                };
+
+                const openItemDialog = (gIndex) => {
+                    currentGroupIndex.value = gIndex;
+                    tempItem.value = { catName: '', name: '', remark: '' };
+                    itemDialog.value = true;
+                };
+
+                const addItem = () => {
+                    const g = groups.value[currentGroupIndex.value];
+                    if (!tempItem.value.catName) tempItem.value.catName = '其他';
+                    if (!g.categories[tempItem.value.catName]) {
+                        g.categories[tempItem.value.catName] = [];
+                    }
+                    g.categories[tempItem.value.catName].push({
+                        name: tempItem.value.name,
+                        remark: tempItem.value.remark,
+                        checked: false
+                    });
+                    saveData();
+                };
+
+                const removeItem = (gIndex, catName, iIndex) => {
+                    groups.value[gIndex].categories[catName].splice(iIndex, 1);
+                    if (groups.value[gIndex].categories[catName].length === 0) {
+                        delete groups.value[gIndex].categories[catName];
+                    }
+                    saveData();
+                };
+
+                const removeGroup = (index) => {
+                    vant.showConfirmDialog({ message: '确定删除此清单模块？' }).then(() => {
+                        groups.value.splice(index, 1);
+                        saveData();
+                    });
+                };
+
+                const exportImage = () => {
+                    isExporting.value = true;
+                    setTimeout(() => {
+                        const area = document.getElementById('capture-area');
+                        html2canvas(area, {
+                            useCORS: true,
+                            scale: 2,
+                            backgroundColor: '#f2f6fc'
+                        }).then(canvas => {
+                            const link = document.createElement('a');
+                            link.download = `Tation清单_${new Date().toLocaleDateString()}.png`;
+                            link.href = canvas.toDataURL();
+                            link.click();
+                            isExporting.value = false;
+                            vant.showSuccessToast('生成成功');
+                        }).catch(() => {
+                            isExporting.value = false;
+                            vant.showFailToast('生成失败');
+                        });
+                    }, 300);
+                };
+
+                return { groups, isExporting, showAddGroup, newGroupName, itemDialog, tempItem, openItemDialog, addItem, addGroup, removeGroup, removeItem, exportImage, saveData };
+            }
+        }).use(vant).mount('#app');
+    </script>
+</body>
+</html>
